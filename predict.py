@@ -6,8 +6,10 @@ import cv2
 import numpy as np
 import torch
 import yaml
-from fire import Fire
+import json
+import argparse
 from tqdm import tqdm
+from pathlib import Path
 
 from aug import get_normalize
 from models.networks import get_generator
@@ -88,10 +90,10 @@ def process_video(pairs, predictor, output_dir):
             pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
             video_out.write(pred)
 
-def main(img_pattern: str,
+def main(img_pattern='input/*',
          mask_pattern: Optional[str] = None,
-         weights_path='fpn_inception.h5',
-         out_dir='submit/',
+         weights_path='checkpoints/fpn_inception.h5',
+         out_dir='output/',
          side_by_side: bool = False,
          video: bool = False):
     def sorted_glob(pattern):
@@ -119,24 +121,18 @@ def main(img_pattern: str,
     else:
         process_video(pairs, predictor, out_dir)
 
-# def getfiles():
-#     filenames = os.listdir(r'.\dataset1\blur')
-#     print(filenames)
-def get_files():
-    list=[]
-    for filepath,dirnames,filenames in os.walk(r'.\dataset1\blur'):
-        for filename in filenames:
-            list.append(os.path.join(filepath,filename))
-    return list
-
-
-
-
-
 if __name__ == '__main__':
-  #  Fire(main)
-#增加批量处理图片：
-    img_path=get_files()
-    for i in img_path:
-        main(i)
-    # main('test_img/tt.mp4')
+    # Parse command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("param_file", type=Path)
+    args = parser.parse_args()
+
+    # Load parameter information from JSON file
+    with args.param_file.open("rt") as pf:
+        param = json.load(pf)
+
+    main(
+        img_pattern=os.path.join(param['FilePath']['InputImagePath'], '*'),
+        weights_path=os.path.join(param['FilePath']['CheckpointsPath'], 'fpn_inception.h5'),
+        out_dir=param['FilePath']['OutputImagePath']
+    )

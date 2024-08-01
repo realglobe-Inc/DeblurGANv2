@@ -1,0 +1,7 @@
+{
+  "FilePath": {
+    "InputImagePath": "./input",
+    "OutputImagePath": "./output",
+    "CheckpointsPath": "./checkpoints"
+  }
+}

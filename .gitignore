@@ -3,3 +3,16 @@
 #fpn_inception.h5
 #fpn_mobilenet.h5
 *.h5
+__pycache__
+
+/DeblurGANv2
+
+/fpn
+
+
+/input/*
+!/input/.keep
+/output/*
+!/output/.keep
+/checkpoint/*
+!/checkpoint/.keep

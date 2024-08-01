@@ -5,8 +5,8 @@ experiment_desc: fpn
 train:
 #  files_a: &FILES_A /datasets/my_dataset/**/*.jpg
   #可以使用绝对路径
-  files_a: &FILES_A D:/deblur/goprol_large/**/*.png
-  files_b: *FILES_A
+  files_a: &FILES_A ./datasets/blurred/*.png
+  files_b: &FILES_B ./datasets/sharp/*.png
 #  files_a: &FILES_A ./dataset1/blur/*.png
 #  files_b: &FILES_B ./dataset1/sharp/*.png
   size: &SIZE 256
