@@ -134,7 +134,7 @@ if __name__ == '__main__':
         param = json.load(pf)
 
     main(
-        img_pattern=os.path.join(param['FilePath']['InputImagePath'], '*'),
-        weights_path=os.path.join(param['FilePath']['CheckpointsPath'], 'fpn_inception.h5'),
-        out_dir=param['FilePath']['OutputImagePath']
+        img_pattern=os.path.join(os.path.expanduser(param['FilePath']['InputImagePath']), '*'),
+        weights_path=os.path.join(os.path.expanduser(param['FilePath']['CheckpointsPath']), 'fpn_inception.h5'),
+        out_dir=os.path.expanduser(param['FilePath']['OutputImagePath'])
     )
