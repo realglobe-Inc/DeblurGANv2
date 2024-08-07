@@ -109,7 +109,9 @@ def main(img_pattern='input/*',
     if not video:
         for name, pair in tqdm(zip(names, pairs), total=len(names)):
             f_img, f_mask = pair
-            img, mask = map(cv2.imread, (f_img, f_mask))
+
+            img = cv2.imread(f_img) if f_img else None
+            mask = cv2.imread(f_mask) if f_mask else None
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
             pred = predictor(img, mask)
