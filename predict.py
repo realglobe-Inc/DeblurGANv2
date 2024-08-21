@@ -15,6 +15,20 @@ from aug import get_normalize
 from models.networks import get_generator
 
 
+def fix_relative_path(path):
+    if os.path.isabs(path):
+        return path
+    else:
+        return os.path.join('.', os.path.relpath(path, start=Path('.')))
+
+
+def sorted_glob(patterns):
+    files = []
+    for pattern in patterns:
+        files.extend(glob(pattern, recursive=True))
+    return sorted(files)
+
+
 class Predictor:
     def __init__(self, weights_path: str, model_name: str = ''):
         with open('config/config.yaml',encoding='utf-8') as cfg:
@@ -90,22 +104,24 @@ def process_video(pairs, predictor, output_dir):
             pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
             video_out.write(pred)
 
-def main(img_pattern='input/*',
+def main(input_dir='./input/',
          mask_pattern: Optional[str] = None,
          weights_path='checkpoints/fpn_inception.h5',
-         out_dir='output/',
+         output_dir='./output/',
          side_by_side: bool = False,
          video: bool = False):
-    def sorted_glob(pattern):
-        return sorted(glob(pattern))
 
-    imgs = sorted_glob(img_pattern)
+    img_patterns = [
+        os.path.join(os.path.expanduser(input_dir), '**', '*.jpg'),
+        os.path.join(os.path.expanduser(input_dir), '**', '*.png')
+    ]
+    imgs = sorted_glob(img_patterns)
     masks = sorted_glob(mask_pattern) if mask_pattern is not None else [None for _ in imgs]
     pairs = zip(imgs, masks)
-    names = sorted([os.path.basename(x) for x in glob(img_pattern)])
+    names = imgs
     predictor = Predictor(weights_path=weights_path)
 
-    os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
     if not video:
         for name, pair in tqdm(zip(names, pairs), total=len(names)):
             f_img, f_mask = pair
@@ -118,23 +134,30 @@ def main(img_pattern='input/*',
             if side_by_side:
                 pred = np.hstack((img, pred))
             pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(os.path.join(out_dir, name),
-                        pred)
+
+            relative_path = os.path.relpath(f_img, start=Path(input_dir))
+            save_path = os.path.join(output_dir, relative_path)
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            cv2.imwrite(save_path, pred)
     else:
-        process_video(pairs, predictor, out_dir)
+        process_video(pairs, predictor, output_dir)
 
 if __name__ == '__main__':
     # Parse command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("param_file", type=Path)
-    args = parser.parse_args()
-
-    # Load parameter information from JSON file
-    with args.param_file.open("rt") as pf:
-        param = json.load(pf)
-
-    main(
-        img_pattern=os.path.join(os.path.expanduser(param['FilePath']['InputImagePath']), '*'),
-        weights_path=os.path.join(os.path.expanduser(param['FilePath']['CheckpointsPath']), 'fpn_inception.h5'),
-        out_dir=os.path.expanduser(param['FilePath']['OutputImagePath'])
+    parser.add_argument(
+        '-i', '--input', type=str, default='input', help='Input image or folder'
     )
+    parser.add_argument(
+        '-o', '--output', type=str, default='output', help='Output folder'
+    )
+    parser.add_argument(
+        '-c', '--checkpoint', type=str, default='checkpoints/fpn_inception.h5', help='Checkpoint Path'
+    )
+
+    args = parser.parse_args()
+    args.input = os.path.expanduser(fix_relative_path(args.input))
+    args.output = os.path.expanduser(fix_relative_path(args.output))
+    args.checkpoint = os.path.expanduser(fix_relative_path(args.checkpoint))
+
+    main(input_dir=args.input, weights_path=args.checkpoint, output_dir=args.output)
