@@ -122,7 +122,7 @@ class FPN(nn.Module):
         self.td3 = nn.Sequential(nn.Conv2d(num_filters, num_filters, kernel_size=3, padding=1),
                                  norm_layer(num_filters),
                                  nn.ReLU(inplace=True))
-        self.pad = nn.ReflectionPad2d(1)
+
         self.lateral4 = nn.Conv2d(2080, num_filters, kernel_size=1, bias=False)
         self.lateral3 = nn.Conv2d(1088, num_filters, kernel_size=1, bias=False)
         self.lateral2 = nn.Conv2d(192, num_filters, kernel_size=1, bias=False)
@@ -137,7 +137,6 @@ class FPN(nn.Module):
             param.requires_grad = True
 
     def forward(self, x):
-
         # Bottom-up pathway, from ResNet
         enc0 = self.enc0(x)
 
@@ -151,10 +150,18 @@ class FPN(nn.Module):
 
         # Lateral connections
 
-        lateral4 = self.pad(self.lateral4(enc4))
-        lateral3 = self.pad(self.lateral3(enc3))
-        lateral2 = self.lateral2(enc2)
-        lateral1 = self.pad(self.lateral1(enc1))
+        def safe_pad(tensor, pad, mode="reflect"):
+            _, _, h, w = tensor.size()
+            # Height or width is too small
+            if h <= pad[2] * 2 or w <= pad[0] * 2:
+                return F.pad(tensor, pad, mode="constant", value=0)
+
+            return F.pad(tensor, pad, mode=mode)
+
+        lateral4 = safe_pad(self.lateral4(enc4), (1, 1, 1, 1), mode="reflect")
+        lateral3 = safe_pad(self.lateral3(enc3), (1, 1, 1, 1), mode="reflect")
+        lateral2 = self.lateral2(enc2)  # No reflection padding applied here
+        lateral1 = safe_pad(self.lateral1(enc1), (1, 1, 1, 1), mode="reflect")
         lateral0 = self.lateral0(enc0)
 
         # Top-down pathway

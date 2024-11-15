@@ -6,7 +6,6 @@ import cv2
 import numpy as np
 import torch
 import yaml
-import json
 import argparse
 from tqdm import tqdm
 from pathlib import Path
@@ -121,6 +120,7 @@ def main(input_dir='./input/',
     names = imgs
     predictor = Predictor(weights_path=weights_path)
 
+    skip_count = 0
     os.makedirs(output_dir, exist_ok=True)
     if not video:
         for name, pair in tqdm(zip(names, pairs), total=len(names)):
@@ -128,19 +128,25 @@ def main(input_dir='./input/',
 
             img = cv2.imread(f_img) if f_img else None
             mask = cv2.imread(f_mask) if f_mask else None
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-            pred = predictor(img, mask)
-            if side_by_side:
-                pred = np.hstack((img, pred))
-            pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
+            try:
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                pred = predictor(img_rgb, mask)
+                if side_by_side:
+                    pred = np.hstack((img_rgb, pred))
+                result_img = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
+            except Exception:
+                skip_count += 1
+                print(f"Skipping Debluring {name}")
+                result_img = img
 
             relative_path = os.path.relpath(f_img, start=Path(input_dir))
             save_path = os.path.join(output_dir, relative_path)
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            cv2.imwrite(save_path, pred)
+            cv2.imwrite(save_path, result_img)
     else:
         process_video(pairs, predictor, output_dir)
+
+    print(f"Skip : {skip_count}, Success : {len(names) - skip_count}")
 
 if __name__ == '__main__':
     # Parse command line arguments
