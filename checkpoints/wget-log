@@ -1,6 +1,0 @@
---2024-11-15 08:36:02--  https://drive.google.com/uc?export=view
-Resolving drive.google.com (drive.google.com)... 216.58.220.110, 2404:6800:4004:824::200e
-Connecting to drive.google.com (drive.google.com)|216.58.220.110|:443... connected.
-HTTP request sent, awaiting response... 400 Bad Request
-2024-11-15 08:36:02 ERROR 400: Bad Request.
-
