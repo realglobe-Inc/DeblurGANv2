@@ -1,4 +1,5 @@
 import os
+import traceback
 from glob import glob
 from typing import Optional
 
@@ -102,17 +103,74 @@ def process_video(pairs, predictor, output_dir):
       pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
       video_out.write(pred)
 
+def split_and_process_image(img, mask, predictor, tile_size: int, side_by_side=False):
+  # 1. 画像の分割処理
+  def split_image(img: np.ndarray, tile_size: int) -> tuple[list[tuple[int, int, np.ndarray]], int, int]:
+    h, w = img.shape[:2]
+    tiles = []
+    for y in range(0, h, tile_size):
+      for x in range(0, w, tile_size):
+        tiles.append((x, y, img[y:y + tile_size, x:x + tile_size]))
+    return tiles, h, w
 
-def main(input_dir='./input/',
+  # 2. 分割した画像を統合する関数
+  def merge_images(tiles: list[tuple[int, int, np.ndarray]], original_size: tuple[int, int]) -> np.ndarray:
+    orig_h, orig_w = original_size
+    merged_img = np.zeros((orig_h, orig_w, 3), dtype=np.uint8)
+    for (x, y, tile) in tiles:
+      merged_img[y:y + tile.shape[0], x:x + tile.shape[1]] = tile
+    return merged_img
+
+  result_tiles = []
+  tiles, orig_h, orig_w = split_image(img, tile_size)
+
+  cv2.imwrite(f"/tmp/mask.png", mask)
+
+  # 各タイルごとに処理する
+  for x, y, tile in tiles:
+    img_rgb = cv2.cvtColor(tile, cv2.COLOR_BGR2RGB)
+    m = mask[y:y + tile.shape[0], x:x + tile.shape[1]]
+    pred = predictor(img_rgb, m)
+    if side_by_side:
+      pred = np.hstack((img_rgb, pred))
+    processed_tile = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
+    result_tiles.append((x, y, processed_tile))
+
+  # 3. 処理されたタイルを統合して戻す
+  return merge_images(result_tiles, (orig_h, orig_w))
+
+def pad_and_process_image(img, mask, predictor, min_size: int, tile_size: int, side_by_side=False):
+  # 処理前の元の画像サイズを保持
+  original_h, original_w = img.shape[:2]
+
+  if original_h < min_size or original_w < min_size:
+    padded_h = max(original_h, min_size)
+    padded_w = max(original_w, min_size)
+
+    # 白色 (255, 255, 255) で画像を埋める
+    padded_img = np.ones((padded_h, padded_w, 3), dtype=np.uint8) * 255
+    padded_img[:original_h, :original_w] = img
+    img = padded_img
+
+    padded_mask = np.zeros((padded_h, padded_w, 3), dtype=np.uint8)
+    padded_mask[:original_h, :original_w] = mask
+    mask = padded_mask
+
+  result_img = split_and_process_image(img, mask, predictor, tile_size, side_by_side)
+  # 必要なら元のサイズにトリミング
+  return result_img[:original_h, :original_w]
+
+def main(input_dir: str,
+         output_dir: str,
+         input_format: str,
+         output_format: str,
          mask_pattern: Optional[str] = None,
          weights_path='checkpoints/fpn_inception.h5',
-         output_dir='./output/',
          side_by_side: bool = False,
          video: bool = False):
 
   img_patterns = [
-      os.path.join(os.path.expanduser(input_dir), '**', '*.jpg'),
-      os.path.join(os.path.expanduser(input_dir), '**', '*.png')
+      os.path.join(os.path.expanduser(input_dir), '**', f'*.{input_format}'),
   ]
   imgs = sorted_glob(img_patterns)
   masks = sorted_glob(mask_pattern) if mask_pattern is not None else [None for _ in imgs]
@@ -127,20 +185,35 @@ def main(input_dir='./input/',
       f_img, f_mask = pair
 
       img = cv2.imread(f_img) if f_img else None
-      mask = cv2.imread(f_mask) if f_mask else None
+      if f_mask:
+        mask = cv2.imread(f_mask, cv2.IMREAD_GRAYSCALE)
+      else:
+        threshold = 254
+        white_mask = (img[:, :, 0] >= threshold) & (img[:, :, 1] >= threshold) & (img[:, :, 2] >= threshold)
+        # 新しいマスク画像を作成（初期値は黒）
+        mask = np.zeros_like(img, dtype=np.uint8)
+
+        # 白でないピクセルを (255,255,255) にする
+        mask[~white_mask] = [255, 255, 255]  # 白でない部分を白にする
+        # gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # # 白に近いピクセルを0、それ以外を255にする
+        # _, mask = cv2.threshold(gray_img, 254, 255, cv2.THRESH_BINARY_INV)
+
       try:
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        pred = predictor(img_rgb, mask)
-        if side_by_side:
-          pred = np.hstack((img_rgb, pred))
-        result_img = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
-      except Exception:
+        result_img = pad_and_process_image(img, mask, predictor, 128, 2048, side_by_side)
+        # img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # pred = predictor(img_rgb, mask)
+        # if side_by_side:
+        #   pred = np.hstack((img_rgb, pred))
+        # result_img = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
+      except Exception as e:
         skip_count += 1
-        print(f"Skipping Debluring {name}")
+        print(f"Skipping Debluring {name}: {e}")
+        traceback.print_exc()
         result_img = img
 
       relative_path = os.path.relpath(f_img, start=Path(input_dir))
-      save_path = os.path.join(output_dir, relative_path)
+      save_path = os.path.join(output_dir, os.path.splitext(relative_path)[0] + f'.{output_format}')
       os.makedirs(os.path.dirname(save_path), exist_ok=True)
       cv2.imwrite(save_path, result_img)
   else:
@@ -161,10 +234,16 @@ if __name__ == '__main__':
   parser.add_argument(
       '-c', '--checkpoint', type=str, default='checkpoints/fpn_inception.h5', help='Checkpoint Path'
   )
+  parser.add_argument(
+    '--input-format', type=str, default='png', help='Input image extension'
+  )
+  parser.add_argument(
+    '--output-format', type=str, default='png', help='Output image extension'
+  )
 
   args = parser.parse_args()
   args.input = fix_relative_path(args.input)
   args.output = fix_relative_path(args.output)
   args.checkpoint = fix_relative_path(args.checkpoint)
 
-  main(input_dir=args.input, weights_path=args.checkpoint, output_dir=args.output)
+  main(input_dir=args.input, weights_path=args.checkpoint, output_dir=args.output, input_format=args.input_format, output_format=args.output_format)
