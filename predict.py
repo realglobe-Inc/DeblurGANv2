@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import traceback
 from glob import glob
 from pathlib import Path
@@ -180,42 +181,52 @@ def main(input_dir: str,
 
     skip_count = 0
     os.makedirs(output_dir, exist_ok=True)
+    isatty = sys.stdout.isatty()
     if not video:
-        for name, pair in tqdm(zip(names, pairs), total=len(names)):
-            f_img, f_mask = pair
-
-            img = cv2.imread(f_img) if f_img else None
-            if f_mask:
-                mask = cv2.imread(f_mask, cv2.IMREAD_GRAYSCALE)
-            else:
-                threshold = 254
-                white_mask = (img[:, :, 0] >= threshold) & (img[:, :, 1] >= threshold) & (img[:, :, 2] >= threshold)
-                # 新しいマスク画像を作成（初期値は黒）
-                mask = np.zeros_like(img, dtype=np.uint8)
-
-                # 白でないピクセルを (255,255,255) にする
-                mask[~white_mask] = [255, 255, 255]  # 白でない部分を白にする
-                # gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                # # 白に近いピクセルを0、それ以外を255にする
-                # _, mask = cv2.threshold(gray_img, 254, 255, cv2.THRESH_BINARY_INV)
+        pbar = tqdm(total=len(names), unit="file", leave=False, dynamic_ncols=isatty, disable=not isatty)
+        for name, pair in zip(names, pairs):
+            pbar.set_description(os.path.basename(name))
+            if not isatty:
+                print(f'Processing {os.path.basename(name)}')
 
             try:
-                result_img = pad_and_process_image(img, mask, predictor, 128, 2048, side_by_side)
-                # img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                # pred = predictor(img_rgb, mask)
-                # if side_by_side:
-                #   pred = np.hstack((img_rgb, pred))
-                # result_img = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
-            except Exception as e:
-                skip_count += 1
-                print(f"Skipping Debluring {name}: {e}")
-                traceback.print_exc()
-                result_img = img
+                f_img, f_mask = pair
 
-            relative_path = os.path.relpath(f_img, start=Path(input_dir))
-            save_path = os.path.join(output_dir, os.path.splitext(relative_path)[0] + f'.{output_format}')
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            cv2.imwrite(save_path, result_img)
+                img = cv2.imread(f_img) if f_img else None
+                if f_mask:
+                    mask = cv2.imread(f_mask, cv2.IMREAD_GRAYSCALE)
+                else:
+                    threshold = 254
+                    white_mask = (img[:, :, 0] >= threshold) & (img[:, :, 1] >= threshold) & (img[:, :, 2] >= threshold)
+                    # 新しいマスク画像を作成（初期値は黒）
+                    mask = np.zeros_like(img, dtype=np.uint8)
+
+                    # 白でないピクセルを (255,255,255) にする
+                    mask[~white_mask] = [255, 255, 255]  # 白でない部分を白にする
+                    # gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    # # 白に近いピクセルを0、それ以外を255にする
+                    # _, mask = cv2.threshold(gray_img, 254, 255, cv2.THRESH_BINARY_INV)
+
+                try:
+                    result_img = pad_and_process_image(img, mask, predictor, 128, 2048, side_by_side)
+                    # img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    # pred = predictor(img_rgb, mask)
+                    # if side_by_side:
+                    #   pred = np.hstack((img_rgb, pred))
+                    # result_img = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
+                except Exception as e:
+                    skip_count += 1
+                    print(f"Skipping Debluring {name}: {e}")
+                    traceback.print_exc()
+                    result_img = img
+
+                relative_path = os.path.relpath(f_img, start=Path(input_dir))
+                save_path = os.path.join(output_dir, os.path.splitext(relative_path)[0] + f'.{output_format}')
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                cv2.imwrite(save_path, result_img)
+            finally:
+                pbar.update(1)
+        pbar.close()
     else:
         process_video(pairs, predictor, output_dir)
 
