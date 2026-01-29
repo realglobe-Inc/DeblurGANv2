@@ -170,9 +170,28 @@ def main(input_dir: str,
          weights_path='checkpoints/fpn_inception.h5',
          side_by_side: bool = False,
          video: bool = False):
-    img_patterns = [
-        os.path.join(os.path.expanduser(input_dir), '**', f'*.{input_format}'),
-    ]
+    # Build case-insensitive glob patterns based on input format
+    fmt = input_format.lower()
+    if fmt == 'all':
+        img_patterns = [
+            os.path.join(input_dir, '**', '*.[jJ][pP][gG]'),
+            os.path.join(input_dir, '**', '*.[jJ][pP][eE][gG]'),
+            os.path.join(input_dir, '**', '*.[pP][nN][gG]'),
+        ]
+    elif fmt in ('jpg', 'jpeg'):
+        img_patterns = [
+            os.path.join(input_dir, '**', '*.[jJ][pP][gG]'),
+            os.path.join(input_dir, '**', '*.[jJ][pP][eE][gG]'),
+        ]
+    elif fmt == 'png':
+        img_patterns = [
+            os.path.join(input_dir, '**', '*.[pP][nN][gG]'),
+        ]
+    else:
+        # Fallback: use specified format as-is (case-sensitive)
+        img_patterns = [
+            os.path.join(input_dir, '**', f'*.{input_format}'),
+        ]
     imgs = sorted_glob(img_patterns)
     masks = sorted_glob(mask_pattern) if mask_pattern is not None else [None for _ in imgs]
     pairs = zip(imgs, masks)
@@ -246,7 +265,7 @@ if __name__ == '__main__':
         '-c', '--checkpoint', type=str, default='checkpoints/fpn_inception.h5', help='Checkpoint Path'
     )
     parser.add_argument(
-        '--input-format', type=str, default='png', help='Input image extension'
+        '--input-format', type=str, default='all', help='Input image extension: all | jpg | jpeg | png'
     )
     parser.add_argument(
         '--output-format', type=str, default='png', help='Output image extension'
