@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from models.mobilenet_v2 import MobileNetV2
+from .mobilenet_v2 import MobileNetV2
+
 
 class FPNHead(nn.Module):
     def __init__(self, num_in, num_mid, num_out):
@@ -17,13 +18,22 @@ class FPNHead(nn.Module):
 
 class FPNMobileNet(nn.Module):
 
-    def __init__(self, norm_layer, output_ch=3, num_filters=64, num_filters_fpn=128, pretrained=True):
+    def __init__(
+        self,
+        norm_layer,
+        output_ch=3,
+        num_filters=64,
+        num_filters_fpn=128,
+        pretrained=True,
+    ):
         super().__init__()
 
         # Feature Pyramid Network (FPN) with four feature maps of resolutions
         # 1/4, 1/8, 1/16, 1/32 and `num_filters` filters for all feature maps.
 
-        self.fpn = FPN(num_filters=num_filters_fpn, norm_layer = norm_layer, pretrained=pretrained)
+        self.fpn = FPN(
+            num_filters=num_filters_fpn, norm_layer=norm_layer, pretrained=pretrained
+        )
 
         # The segmentation heads on top of the FPN
 
@@ -53,15 +63,23 @@ class FPNMobileNet(nn.Module):
 
         map0, map1, map2, map3, map4 = self.fpn(x)
 
-        map4 = nn.functional.upsample(self.head4(map4), scale_factor=8, mode="nearest")
-        map3 = nn.functional.upsample(self.head3(map3), scale_factor=4, mode="nearest")
-        map2 = nn.functional.upsample(self.head2(map2), scale_factor=2, mode="nearest")
-        map1 = nn.functional.upsample(self.head1(map1), scale_factor=1, mode="nearest")
+        map4 = nn.functional.interpolate(
+            self.head4(map4), scale_factor=8, mode="nearest"
+        )
+        map3 = nn.functional.interpolate(
+            self.head3(map3), scale_factor=4, mode="nearest"
+        )
+        map2 = nn.functional.interpolate(
+            self.head2(map2), scale_factor=2, mode="nearest"
+        )
+        map1 = nn.functional.interpolate(
+            self.head1(map1), scale_factor=1, mode="nearest"
+        )
 
         smoothed = self.smooth(torch.cat([map4, map3, map2, map1], dim=1))
-        smoothed = nn.functional.upsample(smoothed, scale_factor=2, mode="nearest")
+        smoothed = nn.functional.interpolate(smoothed, scale_factor=2, mode="nearest")
         smoothed = self.smooth2(smoothed + map0)
-        smoothed = nn.functional.upsample(smoothed, scale_factor=2, mode="nearest")
+        smoothed = nn.functional.interpolate(smoothed, scale_factor=2, mode="nearest")
 
         final = self.final(smoothed)
         res = torch.tanh(final) + x
@@ -82,8 +100,10 @@ class FPN(nn.Module):
         net = MobileNetV2(n_class=1000)
 
         if pretrained:
-            #Load weights into the project directory
-            state_dict = torch.load('mobilenetv2.pth.tar') # add map_location='cpu' if no gpu
+            # Load weights into the project directory
+            state_dict = torch.load(
+                "mobilenetv2.pth.tar"
+            )  # add map_location='cpu' if no gpu
             net.load_state_dict(state_dict)
         self.features = net.features
 
@@ -93,15 +113,21 @@ class FPN(nn.Module):
         self.enc3 = nn.Sequential(*self.features[7:11])
         self.enc4 = nn.Sequential(*self.features[11:16])
 
-        self.td1 = nn.Sequential(nn.Conv2d(num_filters, num_filters, kernel_size=3, padding=1),
-                                 norm_layer(num_filters),
-                                 nn.ReLU(inplace=True))
-        self.td2 = nn.Sequential(nn.Conv2d(num_filters, num_filters, kernel_size=3, padding=1),
-                                 norm_layer(num_filters),
-                                 nn.ReLU(inplace=True))
-        self.td3 = nn.Sequential(nn.Conv2d(num_filters, num_filters, kernel_size=3, padding=1),
-                                 norm_layer(num_filters),
-                                 nn.ReLU(inplace=True))
+        self.td1 = nn.Sequential(
+            nn.Conv2d(num_filters, num_filters, kernel_size=3, padding=1),
+            norm_layer(num_filters),
+            nn.ReLU(inplace=True),
+        )
+        self.td2 = nn.Sequential(
+            nn.Conv2d(num_filters, num_filters, kernel_size=3, padding=1),
+            norm_layer(num_filters),
+            nn.ReLU(inplace=True),
+        )
+        self.td3 = nn.Sequential(
+            nn.Conv2d(num_filters, num_filters, kernel_size=3, padding=1),
+            norm_layer(num_filters),
+            nn.ReLU(inplace=True),
+        )
 
         self.lateral4 = nn.Conv2d(160, num_filters, kernel_size=1, bias=False)
         self.lateral3 = nn.Conv2d(64, num_filters, kernel_size=1, bias=False)
@@ -116,19 +142,18 @@ class FPN(nn.Module):
         for param in self.features.parameters():
             param.requires_grad = True
 
-
     def forward(self, x):
 
         # Bottom-up pathway, from ResNet
         enc0 = self.enc0(x)
 
-        enc1 = self.enc1(enc0) # 256
+        enc1 = self.enc1(enc0)  # 256
 
-        enc2 = self.enc2(enc1) # 512
+        enc2 = self.enc2(enc1)  # 512
 
-        enc3 = self.enc3(enc2) # 1024
+        enc3 = self.enc3(enc2)  # 1024
 
-        enc4 = self.enc4(enc3) # 2048
+        enc4 = self.enc4(enc3)  # 2048
 
         # Lateral connections
 
@@ -140,8 +165,13 @@ class FPN(nn.Module):
 
         # Top-down pathway
         map4 = lateral4
-        map3 = self.td1(lateral3 + nn.functional.upsample(map4, scale_factor=2, mode="nearest"))
-        map2 = self.td2(lateral2 + nn.functional.upsample(map3, scale_factor=2, mode="nearest"))
-        map1 = self.td3(lateral1 + nn.functional.upsample(map2, scale_factor=2, mode="nearest"))
+        map3 = self.td1(
+            lateral3 + nn.functional.interpolate(map4, scale_factor=2, mode="nearest")
+        )
+        map2 = self.td2(
+            lateral2 + nn.functional.interpolate(map3, scale_factor=2, mode="nearest")
+        )
+        map1 = self.td3(
+            lateral1 + nn.functional.interpolate(map2, scale_factor=2, mode="nearest")
+        )
         return lateral0, map1, map2, map3, map4
-

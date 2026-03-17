@@ -12,8 +12,10 @@ import torch
 import yaml
 from tqdm import tqdm
 
-from aug import get_normalize
-from models.networks import get_generator
+from ..util.wrapper_base import copy_obj_and_mtl, get_textures_from_obj
+
+from .aug import get_normalize
+from .models.networks import get_generator
 
 
 def fix_relative_path(path):
@@ -29,11 +31,13 @@ def sorted_glob(patterns):
 
 
 class Predictor:
-    def __init__(self, weights_path: str, model_name: str = ''):
-        with open('config/config.yaml', encoding='utf-8') as cfg:
+    def __init__(self, weights_path: str, model_name: str = ""):
+        with open(
+            Path(__file__).resolve().parent / "config/config.yaml", encoding="utf-8"
+        ) as cfg:
             config = yaml.load(cfg, Loader=yaml.FullLoader)
-        model = get_generator(model_name or config['model'])
-        model.load_state_dict(torch.load(weights_path)['model'])
+        model = get_generator(model_name or config["model"])
+        model.load_state_dict(torch.load(weights_path)["model"])
         self.model = model.cuda()
         self.model.train(True)
         # GAN inference should be in train mode to use actual stats in norm layers,
@@ -51,17 +55,18 @@ class Predictor:
         if mask is None:
             mask = np.ones_like(x, dtype=np.float32)
         else:
-            mask = np.round(mask.astype('float32') / 255)
+            mask = np.round(mask.astype("float32") / 255)
 
         h, w, _ = x.shape
         block_size = 32
         min_height = (h // block_size + 1) * block_size
         min_width = (w // block_size + 1) * block_size
 
-        pad_params = {'mode': 'constant',
-                      'constant_values': 0,
-                      'pad_width': ((0, min_height - h), (0, min_width - w), (0, 0))
-                      }
+        pad_params = {
+            "mode": "constant",
+            "constant_values": 0,
+            "pad_width": ((0, min_height - h), (0, min_width - w), (0, 0)),
+        }
         x = np.pad(x, **pad_params)
         mask = np.pad(mask, **pad_params)
 
@@ -69,12 +74,14 @@ class Predictor:
 
     @staticmethod
     def _postprocess(x: torch.Tensor) -> np.ndarray:
-        x, = x
+        (x,) = x
         x = x.detach().cpu().float().numpy()
         x = (np.transpose(x, (1, 2, 0)) + 1) / 2.0 * 255.0
-        return x.astype('uint8')
+        return x.astype("uint8")
 
-    def __call__(self, img: np.ndarray, mask: Optional[np.ndarray], ignore_mask=True) -> np.ndarray:
+    def __call__(
+        self, img: np.ndarray, mask: Optional[np.ndarray], ignore_mask=True
+    ) -> np.ndarray:
         (img, mask), h, w = self._preprocess(img, mask)
         with torch.no_grad():
             inputs = [img.cuda()]
@@ -87,14 +94,20 @@ class Predictor:
 def process_video(pairs, predictor, output_dir):
     for video_filepath, mask in tqdm(pairs):
         video_filename = os.path.basename(video_filepath)
-        output_filepath = os.path.join(output_dir, os.path.splitext(video_filename)[0] + '_deblur.mp4')
+        output_filepath = os.path.join(
+            output_dir, os.path.splitext(video_filename)[0] + "_deblur.mp4"
+        )
         video_in = cv2.VideoCapture(video_filepath)
         fps = video_in.get(cv2.CAP_PROP_FPS)
         width = int(video_in.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(video_in.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frame_num = int(video_in.get(cv2.CAP_PROP_FRAME_COUNT))
-        video_out = cv2.VideoWriter(output_filepath, cv2.VideoWriter_fourcc(*'MP4V'), fps, (width, height))
-        tqdm.write(f'process {video_filepath} to {output_filepath}, {fps}fps, resolution: {width}x{height}')
+        video_out = cv2.VideoWriter(
+            output_filepath, cv2.VideoWriter_fourcc(*"MP4V"), fps, (width, height)
+        )
+        tqdm.write(
+            f"process {video_filepath} to {output_filepath}, {fps}fps, resolution: {width}x{height}"
+        )
         for frame_num in tqdm(range(total_frame_num), desc=video_filename):
             res, img = video_in.read()
             if not res:
@@ -107,20 +120,24 @@ def process_video(pairs, predictor, output_dir):
 
 def split_and_process_image(img, mask, predictor, tile_size: int, side_by_side=False):
     # 1. 画像の分割処理
-    def split_image(img: np.ndarray, tile_size: int) -> tuple[list[tuple[int, int, np.ndarray]], int, int]:
+    def split_image(
+        img: np.ndarray, tile_size: int
+    ) -> tuple[list[tuple[int, int, np.ndarray]], int, int]:
         h, w = img.shape[:2]
         tiles = []
         for y in range(0, h, tile_size):
             for x in range(0, w, tile_size):
-                tiles.append((x, y, img[y:y + tile_size, x:x + tile_size]))
+                tiles.append((x, y, img[y : y + tile_size, x : x + tile_size]))
         return tiles, h, w
 
     # 2. 分割した画像を統合する関数
-    def merge_images(tiles: list[tuple[int, int, np.ndarray]], original_size: tuple[int, int]) -> np.ndarray:
+    def merge_images(
+        tiles: list[tuple[int, int, np.ndarray]], original_size: tuple[int, int]
+    ) -> np.ndarray:
         orig_h, orig_w = original_size
         merged_img = np.zeros((orig_h, orig_w, 3), dtype=np.uint8)
-        for (x, y, tile) in tiles:
-            merged_img[y:y + tile.shape[0], x:x + tile.shape[1]] = tile
+        for x, y, tile in tiles:
+            merged_img[y : y + tile.shape[0], x : x + tile.shape[1]] = tile
         return merged_img
 
     result_tiles = []
@@ -129,7 +146,7 @@ def split_and_process_image(img, mask, predictor, tile_size: int, side_by_side=F
     # 各タイルごとに処理する
     for x, y, tile in tiles:
         img_rgb = cv2.cvtColor(tile, cv2.COLOR_BGR2RGB)
-        m = mask[y:y + tile.shape[0], x:x + tile.shape[1]]
+        m = mask[y : y + tile.shape[0], x : x + tile.shape[1]]
         pred = predictor(img_rgb, m)
         if side_by_side:
             pred = np.hstack((img_rgb, pred))
@@ -140,7 +157,9 @@ def split_and_process_image(img, mask, predictor, tile_size: int, side_by_side=F
     return merge_images(result_tiles, (orig_h, orig_w))
 
 
-def pad_and_process_image(img, mask, predictor, min_size: int, tile_size: int, side_by_side=False):
+def pad_and_process_image(
+    img, mask, predictor, min_size: int, tile_size: int, side_by_side=False
+):
     # 処理前の元の画像サイズを保持
     original_h, original_w = img.shape[:2]
 
@@ -162,19 +181,36 @@ def pad_and_process_image(img, mask, predictor, min_size: int, tile_size: int, s
     return result_img[:original_h, :original_w]
 
 
-def main(input_dir: str,
-         output_dir: str,
-         input_format: str,
-         output_format: str,
-         mask_pattern: Optional[str] = None,
-         weights_path='checkpoints/fpn_inception.h5',
-         side_by_side: bool = False,
-         video: bool = False):
-    img_patterns = [
-        os.path.join(os.path.expanduser(input_dir), '**', f'*.{input_format}'),
+def main(
+    input_dir: str,
+    output_dir: str,
+    input_format: str,
+    output_format: str,
+    mask_pattern: Optional[str] = None,
+    weights_path="checkpoints/fpn_inception.h5",
+    side_by_side: bool = False,
+    video: bool = False,
+):
+    imgs = []
+
+    # OBJファイルからテクスチャを探す
+    obj_patterns = [
+        os.path.join(os.path.expanduser(input_dir), "**", "*.obj"),
     ]
-    imgs = sorted_glob(img_patterns)
-    masks = sorted_glob(mask_pattern) if mask_pattern is not None else [None for _ in imgs]
+    obj_files = sorted_glob(obj_patterns)
+    for obj_file in obj_files:
+        textures = get_textures_from_obj(Path(obj_file))
+        for texture in textures:
+            if (
+                texture.exists()
+                and texture.suffix.lstrip(".").lower() == input_format.lower()
+            ):
+                imgs.append(str(texture))
+    imgs = sorted(list(set(imgs)))
+
+    masks = (
+        sorted_glob(mask_pattern) if mask_pattern is not None else [None for _ in imgs]
+    )
     pairs = zip(imgs, masks)
     names = imgs
     predictor = Predictor(weights_path=weights_path)
@@ -183,11 +219,17 @@ def main(input_dir: str,
     os.makedirs(output_dir, exist_ok=True)
     isatty = sys.stdout.isatty()
     if not video:
-        pbar = tqdm(total=len(names), unit="file", leave=False, dynamic_ncols=isatty, disable=not isatty)
+        pbar = tqdm(
+            total=len(names),
+            unit="file",
+            leave=False,
+            dynamic_ncols=isatty,
+            disable=not isatty,
+        )
         for name, pair in zip(names, pairs):
             pbar.set_description(os.path.basename(name))
             if not isatty:
-                print(f'Processing {os.path.basename(name)}')
+                print(f"Processing {os.path.basename(name)}")
 
             try:
                 f_img, f_mask = pair
@@ -197,7 +239,11 @@ def main(input_dir: str,
                     mask = cv2.imread(f_mask, cv2.IMREAD_GRAYSCALE)
                 else:
                     threshold = 254
-                    white_mask = (img[:, :, 0] >= threshold) & (img[:, :, 1] >= threshold) & (img[:, :, 2] >= threshold)
+                    white_mask = (
+                        (img[:, :, 0] >= threshold)
+                        & (img[:, :, 1] >= threshold)
+                        & (img[:, :, 2] >= threshold)
+                    )
                     # 新しいマスク画像を作成（初期値は黒）
                     mask = np.zeros_like(img, dtype=np.uint8)
 
@@ -208,7 +254,9 @@ def main(input_dir: str,
                     # _, mask = cv2.threshold(gray_img, 254, 255, cv2.THRESH_BINARY_INV)
 
                 try:
-                    result_img = pad_and_process_image(img, mask, predictor, 128, 2048, side_by_side)
+                    result_img = pad_and_process_image(
+                        img, mask, predictor, 128, 2048, side_by_side
+                    )
                     # img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                     # pred = predictor(img_rgb, mask)
                     # if side_by_side:
@@ -221,7 +269,13 @@ def main(input_dir: str,
                     result_img = img
 
                 relative_path = os.path.relpath(f_img, start=Path(input_dir))
-                save_path = os.path.join(output_dir, os.path.splitext(relative_path)[0] + f'.{output_format}')
+                save_path = os.path.normpath(
+                    os.path.join(
+                        output_dir,
+                        "appearance",
+                        os.path.splitext(relative_path)[0] + f".{output_format}",
+                    )
+                )
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
                 cv2.imwrite(save_path, result_img)
             finally:
@@ -232,24 +286,31 @@ def main(input_dir: str,
 
     print(f"Skip : {skip_count}, Success : {len(names) - skip_count}")
 
+    # OBJ と MTL をコピー
+    copy_obj_and_mtl(input_dir, output_dir, output_format)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-i', '--input', type=str, default='input', help='Input image or folder'
+        "-i", "--input", type=str, default="input", help="Input image or folder"
     )
     parser.add_argument(
-        '-o', '--output', type=str, default='output', help='Output folder'
+        "-o", "--output", type=str, default="output", help="Output folder"
     )
     parser.add_argument(
-        '-c', '--checkpoint', type=str, default='checkpoints/fpn_inception.h5', help='Checkpoint Path'
+        "-c",
+        "--checkpoint",
+        type=str,
+        default="checkpoints/fpn_inception.h5",
+        help="Checkpoint Path",
     )
     parser.add_argument(
-        '--input-format', type=str, default='png', help='Input image extension'
+        "--input-format", type=str, default="png", help="Input image extension"
     )
     parser.add_argument(
-        '--output-format', type=str, default='png', help='Output image extension'
+        "--output-format", type=str, default="png", help="Output image extension"
     )
 
     args = parser.parse_args()
@@ -257,5 +318,10 @@ if __name__ == '__main__':
     args.output = fix_relative_path(args.output)
     args.checkpoint = fix_relative_path(args.checkpoint)
 
-    main(input_dir=args.input, weights_path=args.checkpoint, output_dir=args.output, input_format=args.input_format,
-         output_format=args.output_format)
+    main(
+        input_dir=args.input,
+        weights_path=args.checkpoint,
+        output_dir=args.output,
+        input_format=args.input_format,
+        output_format=args.output_format,
+    )

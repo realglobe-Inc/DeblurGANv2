@@ -19,7 +19,9 @@ class FPNSegHead(nn.Module):
 
 class FPNDense(nn.Module):
 
-    def __init__(self, output_ch=3, num_filters=128, num_filters_fpn=256, pretrained=True):
+    def __init__(
+        self, output_ch=3, num_filters=128, num_filters_fpn=256, pretrained=True
+    ):
         super().__init__()
 
         # Feature Pyramid Network (FPN) with four feature maps of resolutions
@@ -51,15 +53,23 @@ class FPNDense(nn.Module):
     def forward(self, x):
         map0, map1, map2, map3, map4 = self.fpn(x)
 
-        map4 = nn.functional.upsample(self.head4(map4), scale_factor=8, mode="nearest")
-        map3 = nn.functional.upsample(self.head3(map3), scale_factor=4, mode="nearest")
-        map2 = nn.functional.upsample(self.head2(map2), scale_factor=2, mode="nearest")
-        map1 = nn.functional.upsample(self.head1(map1), scale_factor=1, mode="nearest")
+        map4 = nn.functional.interpolate(
+            self.head4(map4), scale_factor=8, mode="nearest"
+        )
+        map3 = nn.functional.interpolate(
+            self.head3(map3), scale_factor=4, mode="nearest"
+        )
+        map2 = nn.functional.interpolate(
+            self.head2(map2), scale_factor=2, mode="nearest"
+        )
+        map1 = nn.functional.interpolate(
+            self.head1(map1), scale_factor=1, mode="nearest"
+        )
 
         smoothed = self.smooth(torch.cat([map4, map3, map2, map1], dim=1))
-        smoothed = nn.functional.upsample(smoothed, scale_factor=2, mode="nearest")
+        smoothed = nn.functional.interpolate(smoothed, scale_factor=2, mode="nearest")
         smoothed = self.smooth2(smoothed + map0)
-        smoothed = nn.functional.upsample(smoothed, scale_factor=2, mode="nearest")
+        smoothed = nn.functional.interpolate(smoothed, scale_factor=2, mode="nearest")
 
         final = self.final(smoothed)
         return torch.tanh(final)
@@ -82,9 +92,9 @@ class FPN(nn.Module):
 
         self.features = densenet121(pretrained=pretrained).features
 
-        self.enc0 = nn.Sequential(self.features.conv0,
-                                  self.features.norm0,
-                                  self.features.relu0)
+        self.enc0 = nn.Sequential(
+            self.features.conv0, self.features.norm0, self.features.relu0
+        )
         self.pool0 = self.features.pool0
         self.enc1 = self.features.denseblock1  # 256
         self.enc2 = self.features.denseblock2  # 512
@@ -131,8 +141,14 @@ class FPN(nn.Module):
         # Top-down pathway
 
         map4 = lateral4
-        map3 = lateral3 + nn.functional.upsample(map4, scale_factor=2, mode="nearest")
-        map2 = lateral2 + nn.functional.upsample(map3, scale_factor=2, mode="nearest")
-        map1 = lateral1 + nn.functional.upsample(map2, scale_factor=2, mode="nearest")
+        map3 = lateral3 + nn.functional.interpolate(
+            map4, scale_factor=2, mode="nearest"
+        )
+        map2 = lateral2 + nn.functional.interpolate(
+            map3, scale_factor=2, mode="nearest"
+        )
+        map1 = lateral1 + nn.functional.interpolate(
+            map2, scale_factor=2, mode="nearest"
+        )
 
         return lateral0, map1, map2, map3, map4

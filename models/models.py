@@ -1,7 +1,7 @@
 import numpy as np
 import torch.nn as nn
 from skimage.metrics import structural_similarity as SSIM
-from util.metrics import PSNR
+from ..util.metrics import PSNR
 
 
 class DeblurModel(nn.Module):
@@ -9,9 +9,9 @@ class DeblurModel(nn.Module):
         super(DeblurModel, self).__init__()
 
     def get_input(self, data):
-        img = data['a']
+        img = data["a"]
         inputs = img
-        targets = data['b']
+        targets = data["b"]
         inputs, targets = inputs.cuda(), targets.cuda()
         return inputs, targets
 
