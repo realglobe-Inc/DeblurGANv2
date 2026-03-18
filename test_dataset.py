@@ -5,9 +5,8 @@ from tempfile import mkdtemp
 
 import cv2
 import numpy as np
-from torch.utils.data import DataLoader
-
 from dataset import PairedDataset
+from torch.utils.data import DataLoader
 
 
 def make_img():

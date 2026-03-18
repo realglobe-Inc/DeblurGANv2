@@ -24,7 +24,6 @@ class ContentLoss:
 
 
 class PerceptualLoss:
-
     def contentFunc(self):
         conv_3_3_layer = 14
         cnn = models.vgg19(pretrained=True).features

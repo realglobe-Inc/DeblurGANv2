@@ -1,9 +1,10 @@
 import torch
-from torch import nn
 import torch.nn.parallel
 import torch.optim
 import torch.utils.data
+from torch import nn
 from torch.nn import functional as F
+
 from .senet import se_resnext50_32x4d
 
 
@@ -24,7 +25,6 @@ class ConvRelu(nn.Module):
 
 
 class UNetSEResNext(nn.Module):
-
     def __init__(self, num_classes=3, num_filters=32, pretrained=True, is_deconv=True):
         super().__init__()
         self.num_classes = num_classes

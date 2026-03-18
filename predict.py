@@ -1,6 +1,5 @@
 import argparse
 import os
-import sys
 import traceback
 from glob import glob
 from pathlib import Path
@@ -10,10 +9,11 @@ import cv2
 import numpy as np
 import torch
 import yaml
-from tqdm import tqdm
+from loguru import logger
+
+from src.util.logging import setup_logger
 
 from ..util.wrapper_base import copy_obj_and_mtl, get_textures_from_obj
-
 from .aug import get_normalize
 from .models.networks import get_generator
 
@@ -92,7 +92,7 @@ class Predictor:
 
 
 def process_video(pairs, predictor, output_dir):
-    for video_filepath, mask in tqdm(pairs):
+    for video_filepath, mask in pairs:
         video_filename = os.path.basename(video_filepath)
         output_filepath = os.path.join(
             output_dir, os.path.splitext(video_filename)[0] + "_deblur.mp4"
@@ -105,10 +105,10 @@ def process_video(pairs, predictor, output_dir):
         video_out = cv2.VideoWriter(
             output_filepath, cv2.VideoWriter_fourcc(*"MP4V"), fps, (width, height)
         )
-        tqdm.write(
+        logger.debug(
             f"process {video_filepath} to {output_filepath}, {fps}fps, resolution: {width}x{height}"
         )
-        for frame_num in tqdm(range(total_frame_num), desc=video_filename):
+        for frame_num in range(total_frame_num):
             res, img = video_in.read()
             if not res:
                 break
@@ -218,19 +218,9 @@ def main(
 
     skip_count = 0
     os.makedirs(output_dir, exist_ok=True)
-    isatty = sys.stdout.isatty()
     if not video:
-        pbar = tqdm(
-            total=len(names),
-            unit="file",
-            leave=False,
-            dynamic_ncols=isatty,
-            disable=not isatty,
-        )
         for name, pair in zip(names, pairs):
-            pbar.set_description(os.path.basename(name))
-            if not isatty:
-                print(f"Processing {os.path.basename(name)}")
+            logger.info(f"Processing {os.path.basename(name)}")
 
             try:
                 f_img, f_mask = pair
@@ -257,8 +247,8 @@ def main(
                     )
                 except Exception as e:
                     skip_count += 1
-                    print(f"Skipping Debluring {name}: {e}")
-                    traceback.print_exc()
+                    logger.warning(f"Skipping Debluring {name}: {e}")
+                    logger.debug(traceback.format_exc())
                     result_img = img
 
                 # 新仕様: appearance 直下に bldg_id.ext で保存
@@ -269,12 +259,11 @@ def main(
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
                 cv2.imwrite(save_path, result_img)
             finally:
-                pbar.update(1)
-        pbar.close()
+                pass
     else:
         process_video(pairs, predictor, output_dir)
 
-    print(f"Skip : {skip_count}, Success : {len(names) - skip_count}")
+    logger.debug(f"Skip : {skip_count}, Success : {len(names) - skip_count}")
 
     # OBJ と MTL をコピー
     copy_obj_and_mtl(input_dir, output_dir, output_format)
@@ -303,11 +292,22 @@ if __name__ == "__main__":
         "--output-format", type=str, default="png", help="Output image extension"
     )
     parser.add_argument("--tile-size", type=int, default=1024, help="Tile size")
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="INFO",
+        help="ログレベル (DEBUG, INFO, WARNING, ERROR)",
+    )
+    parser.add_argument(
+        "--log-path", type=Path, default=None, help="ログファイルの出力先パス"
+    )
 
     args = parser.parse_args()
     args.input = fix_relative_path(args.input)
     args.output = fix_relative_path(args.output)
     args.checkpoint = fix_relative_path(args.checkpoint)
+
+    setup_logger(args.log_level, args.log_path)
 
     main(
         input_dir=args.input,

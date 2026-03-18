@@ -1,14 +1,14 @@
+import functools
+
+import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn import init
-import functools
-from torch.autograd import Variable
-import numpy as np
-from .fpn_mobilenet import FPNMobileNet
+
+from .fpn_densenet import FPNDense
 from .fpn_inception import FPNInception
 from .fpn_inception_simple import FPNInceptionSimple
+from .fpn_mobilenet import FPNMobileNet
 from .unet_seresnext import UNetSEResNext
-from .fpn_densenet import FPNDense
 
 ###############################################################################
 # Functions

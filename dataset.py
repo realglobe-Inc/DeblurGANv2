@@ -5,6 +5,7 @@ from glob import glob
 from hashlib import sha1
 from typing import Callable, Iterable, Optional, Tuple
 
+import aug
 import cv2
 import numpy as np
 from glog import logger
@@ -12,8 +13,6 @@ from joblib import Parallel, cpu_count, delayed
 from skimage.io import imread
 from torch.utils.data import Dataset
 from tqdm import tqdm
-
-import aug
 
 
 def subsample(
@@ -32,7 +31,7 @@ def subsample(
     if salt:
         msg += f"; salt is {salt}"
     if verbose:
-        logger.info(msg)
+        logger.debug(msg)
     return np.array(
         [
             sample
@@ -83,7 +82,7 @@ class PairedDataset(Dataset):
         self.corrupt_fn = corrupt_fn
         self.transform_fn = transform_fn
         self.normalize_fn = normalize_fn
-        logger.info(f"Dataset has been created with {len(self.data_a)} samples")
+        logger.debug(f"Dataset has been created with {len(self.data_a)} samples")
 
         if preload:
             preload_fn = partial(self._bulk_preload, preload_size=preload_size)

@@ -1,8 +1,7 @@
 import random
-import numpy as np
-import torch
-from torch.autograd import Variable
 from collections import deque
+
+import torch
 
 
 class ImagePool:

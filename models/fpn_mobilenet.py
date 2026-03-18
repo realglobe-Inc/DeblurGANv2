@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+
 from .mobilenet_v2 import MobileNetV2
 
 
@@ -17,7 +18,6 @@ class FPNHead(nn.Module):
 
 
 class FPNMobileNet(nn.Module):
-
     def __init__(
         self,
         norm_layer,
@@ -88,7 +88,6 @@ class FPNMobileNet(nn.Module):
 
 
 class FPN(nn.Module):
-
     def __init__(self, norm_layer, num_filters=128, pretrained=True):
         """Creates an `FPN` instance for feature extraction.
         Args:

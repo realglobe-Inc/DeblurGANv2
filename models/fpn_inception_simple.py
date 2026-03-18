@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from pretrainedmodels import inceptionresnetv2
 import torch.nn.functional as F
+from pretrainedmodels import inceptionresnetv2
 
 
 class FPNHead(nn.Module):
@@ -33,7 +33,6 @@ class ConvBlock(nn.Module):
 
 
 class FPNInceptionSimple(nn.Module):
-
     def __init__(self, norm_layer, output_ch=3, num_filters=128, num_filters_fpn=256):
         super().__init__()
 
@@ -94,7 +93,6 @@ class FPNInceptionSimple(nn.Module):
 
 
 class FPN(nn.Module):
-
     def __init__(self, norm_layer, num_filters=256):
         """Creates an `FPN` instance for feature extraction.
         Args:

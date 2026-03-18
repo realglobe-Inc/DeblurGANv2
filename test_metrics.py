@@ -1,20 +1,22 @@
 from __future__ import print_function
+
 import argparse
+import glob
+import os
+import shutil
+
+import cv2
 import numpy as np
 import torch
-import cv2
-import yaml
-import os
-from torchvision import models, transforms
-from torch.autograd import Variable
-import shutil
-import glob
 import tqdm
-from util.metrics import PSNR
-from albumentations import Compose, CenterCrop, PadIfNeeded
+import yaml
+from albumentations import CenterCrop, Compose, PadIfNeeded
+from models.networks import get_generator
 from PIL import Image
 from ssim.ssimlib import SSIM
-from models.networks import get_generator
+from torch.autograd import Variable
+from torchvision import transforms
+from util.metrics import PSNR
 
 
 def get_args():

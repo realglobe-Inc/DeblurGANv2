@@ -1,5 +1,4 @@
 import logging
-import os
 from functools import partial
 
 import cv2
@@ -7,17 +6,15 @@ import torch
 import torch.optim as optim
 import tqdm
 import yaml
-from joblib import cpu_count
-from torch.utils.data import DataLoader
-
 from adversarial_trainer import GANFactory
 from dataset import PairedDataset
+from fire import Fire
 from metric_counter import MetricCounter
 from models.losses import get_loss
 from models.models import get_model
 from models.networks import get_nets
 from schedulers import LinearDecay, WarmRestart
-from fire import Fire
+from torch.utils.data import DataLoader
 
 cv2.setNumThreads(0)
 

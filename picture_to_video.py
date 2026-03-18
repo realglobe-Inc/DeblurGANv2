@@ -1,5 +1,4 @@
 import os
-import cv2
 
 # # image path
 # im_dir = 'D:\github repo\DeblurGANv2\submit'
@@ -31,8 +30,6 @@ import cv2
 #     print(frame + " has been written!")
 #
 # videowriter.release()
-
-
 # def main():
 #     data_path = 'D:\github repo\DeblurGANv2\submit'
 #     fps = 30  # 视频帧率
@@ -54,10 +51,7 @@ import cv2
 #
 # if __name__ == "__main__":
 #     main()
-
-
 import cv2
-import os
 import numpy as np
 from PIL import Image
 

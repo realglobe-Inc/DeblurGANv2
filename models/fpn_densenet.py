@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-
 from torchvision.models import densenet121
 
 
@@ -18,7 +17,6 @@ class FPNSegHead(nn.Module):
 
 
 class FPNDense(nn.Module):
-
     def __init__(
         self, output_ch=3, num_filters=128, num_filters_fpn=256, pretrained=True
     ):
@@ -80,7 +78,6 @@ class FPNDense(nn.Module):
 
 
 class FPN(nn.Module):
-
     def __init__(self, num_filters=256, pretrained=True):
         """Creates an `FPN` instance for feature extraction.
         Args:

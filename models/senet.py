@@ -1,6 +1,7 @@
-from __future__ import print_function, division, absolute_import
-from collections import OrderedDict
+from __future__ import absolute_import, division, print_function
+
 import math
+from collections import OrderedDict
 
 import torch.nn as nn
 from torch.utils import model_zoo
@@ -86,7 +87,6 @@ pretrained_settings = {
 
 
 class SEModule(nn.Module):
-
     def __init__(self, channels, reduction):
         super(SEModule, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
@@ -218,7 +218,6 @@ class SEResNeXtBottleneck(Bottleneck):
 
 
 class SENet(nn.Module):
-
     def __init__(
         self,
         block,
@@ -399,10 +398,10 @@ class SENet(nn.Module):
 
 
 def initialize_pretrained_model(model, num_classes, settings):
-    assert (
-        num_classes == settings["num_classes"]
-    ), "num_classes should be {}, but is {}".format(
-        settings["num_classes"], num_classes
+    assert num_classes == settings["num_classes"], (
+        "num_classes should be {}, but is {}".format(
+            settings["num_classes"], num_classes
+        )
     )
     model.load_state_dict(model_zoo.load_url(settings["url"]))
     model.input_space = settings["input_space"]

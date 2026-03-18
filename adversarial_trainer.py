@@ -1,5 +1,6 @@
-import torch
 import copy
+
+import torch
 
 
 class GANFactory:
