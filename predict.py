@@ -269,13 +269,18 @@ def main(
                     traceback.print_exc()
                     result_img = img
 
-                relative_path = os.path.relpath(f_img, start=Path(input_dir))
-                save_path = os.path.normpath(
-                    os.path.join(
-                        output_dir,
-                        "appearance",
-                        os.path.splitext(relative_path)[0] + f".{output_format}",
-                    )
+                # relative_path = os.path.relpath(f_img, start=Path(input_dir))
+                # save_path = os.path.normpath(
+                #     os.path.join(
+                #         output_dir,
+                #         "appearance",
+                #         os.path.splitext(relative_path)[0] + f".{output_format}",
+                #     )
+                # )
+                # 新仕様: appearance 直下に bldg_id.ext で保存
+                imgname = os.path.splitext(os.path.basename(f_img))[0]
+                save_path = os.path.join(
+                    output_dir, "appearance", f"{imgname}.{output_format}"
                 )
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
                 cv2.imwrite(save_path, result_img)
