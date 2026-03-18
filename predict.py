@@ -186,6 +186,7 @@ def main(
     output_dir: str,
     input_format: str,
     output_format: str,
+    tile_size: int,
     mask_pattern: Optional[str] = None,
     weights_path="checkpoints/fpn_inception.h5",
     side_by_side: bool = False,
@@ -255,7 +256,7 @@ def main(
 
                 try:
                     result_img = pad_and_process_image(
-                        img, mask, predictor, 128, 2048, side_by_side
+                        img, mask, predictor, 128, tile_size, side_by_side
                     )
                     # img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                     # pred = predictor(img_rgb, mask)
@@ -312,6 +313,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output-format", type=str, default="png", help="Output image extension"
     )
+    parser.add_argument("--tile-size", type=int, default=1024, help="Tile size")
 
     args = parser.parse_args()
     args.input = fix_relative_path(args.input)
@@ -324,4 +326,5 @@ if __name__ == "__main__":
         output_dir=args.output,
         input_format=args.input_format,
         output_format=args.output_format,
+        tile_size=args.tile_size,
     )
