@@ -250,33 +250,17 @@ def main(
 
                     # 白でないピクセルを (255,255,255) にする
                     mask[~white_mask] = [255, 255, 255]  # 白でない部分を白にする
-                    # gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                    # # 白に近いピクセルを0、それ以外を255にする
-                    # _, mask = cv2.threshold(gray_img, 254, 255, cv2.THRESH_BINARY_INV)
 
                 try:
                     result_img = pad_and_process_image(
                         img, mask, predictor, 128, tile_size, side_by_side
                     )
-                    # img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                    # pred = predictor(img_rgb, mask)
-                    # if side_by_side:
-                    #   pred = np.hstack((img_rgb, pred))
-                    # result_img = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
                 except Exception as e:
                     skip_count += 1
                     print(f"Skipping Debluring {name}: {e}")
                     traceback.print_exc()
                     result_img = img
 
-                # relative_path = os.path.relpath(f_img, start=Path(input_dir))
-                # save_path = os.path.normpath(
-                #     os.path.join(
-                #         output_dir,
-                #         "appearance",
-                #         os.path.splitext(relative_path)[0] + f".{output_format}",
-                #     )
-                # )
                 # 新仕様: appearance 直下に bldg_id.ext で保存
                 imgname = os.path.splitext(os.path.basename(f_img))[0]
                 save_path = os.path.join(
