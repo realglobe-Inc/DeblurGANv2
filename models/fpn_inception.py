@@ -91,7 +91,10 @@ class FPN(nn.Module):
         """
 
         super().__init__()
-        self.inception = inceptionresnetv2(num_classes=1000, pretrained='imagenet')
+        # 元コードは pretrained='imagenet' で http://data.lip6.fr/cadene/pretrainedmodels/
+        # から ImageNet 事前学習の重みをDLしていたが、SSL証明書期限切れで失敗するようになった。
+        # 本来このDL重みは直後の fpn_inception.h5 ロードで上書きされるため、初期重みは不要。
+        self.inception = inceptionresnetv2(num_classes=1000, pretrained=None)
 
         self.enc0 = self.inception.conv2d_1a
         self.enc1 = nn.Sequential(
